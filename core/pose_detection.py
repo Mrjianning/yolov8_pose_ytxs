@@ -238,5 +238,10 @@ class Keypoint():
                 
                 # 手肘角度计算
                 left_elbow_angle,right_elbow_angle = calculate_elbow_angle(kpts_map)
+                # 对结果取两位小数
+                left_elbow_angle = round(left_elbow_angle, 2)
+                right_elbow_angle = round(right_elbow_angle, 2)
+
+                # 连线计算
 
             return image,left_elbow_angle,right_elbow_angle

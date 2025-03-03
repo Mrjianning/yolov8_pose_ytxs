@@ -11,9 +11,15 @@ class PoseDetectionApp:
         self.ui = ui
         self.start_flag = True  # 开始标志位
         self.cap = None         
-        self.model=0            # 0 视频 1 摄像头
-        self.show_box=True      # 显示检测框
-        self.show_kpts=True     # 显示关键点
+        self.model = 0          # 0 视频 1 摄像头
+        self.show_box = True    # 显示检测框
+        self.show_kpts = True   # 显示关键点
+        self.drawing = False    # 画线标志位
+        self.points = []        # 存储选择的点（frame坐标系）
+        self.frame = None       # 当前帧
+        
+        # 绑定鼠标事件到label_video
+        self.ui.label_video.mousePressEvent = self.mouse_press_event
 
     def start_operation(self):
         self.start_flag = True
@@ -30,14 +36,11 @@ class PoseDetectionApp:
 
     def select_video(self):
         print("选择视频")
-        # 打开文件对话框，选择视频文件
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFile)
         file_dialog.setNameFilter("Video Files (*.mp4 *.avi)")
-
-        # 打印文件路径
-        if file_dialog.exec_():  # 执行对话框
-            file_path = file_dialog.selectedFiles()[0]  # 获取选择的文件路径
+        if file_dialog.exec_():
+            file_path = file_dialog.selectedFiles()[0]
             print("选择的文件路径:", file_path)
             self.ui.lineEdit_video_path.setText(file_path)
 
@@ -50,82 +53,142 @@ class PoseDetectionApp:
             print("选择了摄像头模式")
             self.model = 1
     
-    def show_box_changed(self,state):
-       if state == Qt.Checked:
-            self.show_box = True
-       else:
-            self.show_box = False
+    def show_box_changed(self, state):
+        self.show_box = (state == Qt.Checked)
 
-    def show_kpts_changed(self,state):
-        if state == Qt.Checked:
-            self.show_kpts = True
-        else:
-            self.show_kpts = False
+    def show_kpts_changed(self, state):
+        self.show_kpts = (state == Qt.Checked)
+
+    def draw_line(self):
+        print("绘制连线")
+        self.ui.pushButton_draw_line.setEnabled(False)
+        self.ui.pushButton_draw_line.setText("绘制中...")
+        self.ui.label_video.setCursor(Qt.CrossCursor)
+        self.drawing = True
+        self.points = []  # 重置点列表
+
+    def map_to_frame(self, x, y):
+        """将Qt控件坐标映射到frame实际坐标"""
+        if self.frame is None:
+            return x, y
+        
+        # 获取label_video的尺寸
+        label_width = self.ui.label_video.width()
+        label_height = self.ui.label_video.height()
+        
+        # 获取frame的实际尺寸
+        frame_height, frame_width = self.frame.shape[:2]
+        
+        # 计算缩放比例
+        scale_x = frame_width / label_width
+        scale_y = frame_height / label_height
+        
+        # 映射坐标
+        frame_x = int(x * scale_x)
+        frame_y = int(y * scale_y)
+        
+        # 确保坐标在frame范围内
+        frame_x = max(0, min(frame_x, frame_width - 1))
+        frame_y = max(0, min(frame_y, frame_height - 1))
+        
+        return frame_x, frame_y
+
+    def mouse_press_event(self, event):
+        if self.drawing and event.button() == Qt.LeftButton:
+            # 获取鼠标点击位置（相对于label_video）
+            x = event.pos().x()
+            y = event.pos().y()
             
+            # 映射到frame坐标系
+            frame_x, frame_y = self.map_to_frame(x, y)
+            self.points.append((frame_x, frame_y))
+            
+            if len(self.points) == 2:
+                self.draw_line_on_frame()
+                self.finish_drawing()
+            else:
+                if self.frame is not None:
+                    frame_copy = self.frame.copy()
+                    cv2.circle(frame_copy, self.points[0], 5, (0, 0, 255), -1)
+                    self.display_frame(frame_copy)
+
+    def draw_line_on_frame(self):
+        if self.frame is not None and len(self.points) == 2:
+            frame_copy = self.frame.copy()
+            cv2.line(frame_copy, self.points[0], self.points[1], (0, 255, 0), 2)
+            cv2.circle(frame_copy, self.points[0], 5, (0, 0, 255), -1)
+            cv2.circle(frame_copy, self.points[1], 5, (0, 0, 255), -1)
+            self.display_frame(frame_copy)
+
+    def finish_drawing(self):
+        self.drawing = False
+        self.ui.pushButton_draw_line.setEnabled(True)
+        self.ui.pushButton_draw_line.setText("绘制连线")
+        self.ui.label_video.setCursor(Qt.ArrowCursor)
+
+    def display_frame(self, frame):
+        height, width, channel = frame.shape
+        bytes_per_line = 3 * width
+        q_img = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
+        self.ui.label_video.setPixmap(QPixmap.fromImage(q_img))
+
     def run(self):
-        # 模型路径
         modelpath = r'models/yolo11n-pose.onnx'
-        # 实例化模型
         keydet = Keypoint(modelpath)
         
         mode = self.model
-
-        # 0 视频 1 摄像头
         if mode == 0:
-            # 获取视频路径
             videopath = self.ui.lineEdit_video_path.text()
             print(videopath)
-            
         elif mode == 1:
             videopath = 0
-
         else:
             print("\033[1;91m 输入错误，请检查mode的赋值 \033[0m")
             return
 
-        # 打开视频
         self.cap = cv2.VideoCapture(videopath)
         if not self.cap.isOpened():
             print("\033[1;91m 无法打开视频源，请检查路径或设备 \033[0m")
             return
 
-        # 返回当前时间
         start_time = time.time()
         counter = 0
 
         try:
             while self.start_flag:
-                # 从摄像头中读取一帧图像
                 ret, frame = self.cap.read()
                 if not ret:
                     print("\033[1;91m 无法读取到下一帧 \033[0m")
                     break
 
                 # 检测
-                image,left_elbow_angle,right_elbow_angle = keydet.inference(frame, self.show_box, self.show_kpts)
+                image, left_elbow_angle, right_elbow_angle = keydet.inference(frame, self.show_box, self.show_kpts)
+                self.frame = image  # 保存当前帧
 
-                # 显示到界面
+                # 显示角度到界面
                 self.ui.label_left_angle.setText(str(left_elbow_angle))
                 self.ui.label_right_angle.setText(str(right_elbow_angle))
 
-                counter += 1  # 计算帧数
-                # 实时显示帧数
-                if (time.time() - start_time) != 0:
-                    cv2.putText(image, "FPS:{0}".format(float('%.1f' % (counter / (time.time() - start_time)))), (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 1)
+                # 处理绘制
+                if self.drawing and len(self.points) == 1:
+                    cv2.circle(image, self.points[0], 5, (0, 0, 255), -1)
+                elif len(self.points) == 2:
+                    cv2.line(image, self.points[0], self.points[1], (0, 255, 0), 2)
+                    cv2.circle(image, self.points[0], 5, (0, 0, 255), -1)
+                    cv2.circle(image, self.points[1], 5, (0, 0, 255), -1)
 
-                    # 将OpenCV图像转换为QImage
-                    height, width,chanel= image.shape
-                    bytesPerLine = 3 * width
-                    qImg = QImage(image.data, width, height, bytesPerLine, QImage.Format_RGB888).rgbSwapped()
-                    
-                    # 显示图像
-                    self.ui.label_video.setPixmap(QPixmap.fromImage(qImg))
+                # 计算并显示FPS
+                counter += 1
+                if (time.time() - start_time) != 0:
+                    fps = float('%.1f' % (counter / (time.time() - start_time)))
+                    cv2.putText(image, f"FPS:{fps}", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 1)
+                    self.display_frame(image)
+
                 cv2.waitKey(1)
 
         except Exception as e:
             print("\033[1;91m 发生异常：", e, "\033[0m")
 
         finally:
-            # 释放视频捕获资源
             self.cap.release()
             print("视频捕获资源已释放")

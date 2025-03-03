@@ -28,6 +28,7 @@ class MainWindow(QMainWindow):
         self._ui.comboBox_select_model.currentIndexChanged.connect(self.on_comboBox_select_model_currentIndexChanged_)  # 选择模型下拉框
         self._ui.checkBox_show_box.stateChanged.connect(self.on_checkBox_show_box_stateChanged_)                        # 显示检测框复选框
         self._ui.checkBox_show_kpts.stateChanged.connect(self.on_checkBox_show_kpts_stateChanged_)                      # 显示关键点复选框
+        self._ui.pushButton_draw_line.clicked.connect(self.on_pushButton_draw_line_clicked_)                                    # 画线按钮
         
     # 开始按钮
     def on_button_start_clicked_(self):
@@ -53,9 +54,24 @@ class MainWindow(QMainWindow):
     def on_checkBox_show_kpts_stateChanged_(self, state):
         self._pose_detection_app.show_kpts_changed(state)
 
+    # 画线按钮
+    def on_pushButton_draw_line_clicked_(self):
+        self._pose_detection_app.draw_line()
+
 if __name__ == "__main__":
 
     app = QApplication(sys.argv)
+
+    # 加载qss 样式
+    try:
+        with open("./gui/qss/4.qss", "r", encoding="utf-8") as qss_file:
+            qss = qss_file.read()
+            app.setStyleSheet(qss)
+    except FileNotFoundError:
+        print("QSS文件未找到，请检查文件路径是否正确。")
+    except Exception as e:
+        print(f"加载QSS文件时发生错误：{e}")
+
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())  # 进入主循环

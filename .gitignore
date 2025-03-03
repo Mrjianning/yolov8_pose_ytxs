@@ -1,2 +1,6 @@
 /e935eb3617312e924d9d2530384ef307.mp4
 /requirment.jpg
+
+**/__pycache__/
+
+*.mp4
