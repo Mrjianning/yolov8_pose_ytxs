@@ -58,3 +58,15 @@ def calculate_elbow_angle(keypoints):
     right_elbow_angle = safe_calculate_angle(right_shoulder, right_elbow, right_wrist)
 
     return left_elbow_angle, right_elbow_angle
+
+def calculate_slope(point1, point2):
+    """计算两点之间直线的斜率"""
+    return (point2[1] - point1[1]) / (point2[0] - point1[0])
+
+def is_midpoint_above_line(midpoint, point1, point2):
+    """判断中点是否在两点连线的上方"""
+    m = calculate_slope(point1, point2)
+    # 通过直线方程计算中点x坐标对应的y坐标
+    line_y_at_midpoint_x = m * (midpoint[0] - point1[0]) + point1[1]
+    # 判断中点的y坐标是否大于计算出的y坐标
+    return midpoint[1] > line_y_at_midpoint_x

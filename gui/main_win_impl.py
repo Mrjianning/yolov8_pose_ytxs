@@ -17,6 +17,7 @@ class PoseDetectionApp:
         self.drawing = False    # 画线标志位
         self.points = []        # 存储选择的点（frame坐标系）
         self.frame = None       # 当前帧
+        self.count_num=0        # 计数器
         
         # 绑定鼠标事件到label_video
         self.ui.label_video.mousePressEvent = self.mouse_press_event
@@ -24,6 +25,8 @@ class PoseDetectionApp:
     def start_operation(self):
         self.start_flag = True
         print("开始操作")
+        self.ui.label_count.clear()
+        self.count_num=0
         self.run()
 
     def stop_operation(self):
@@ -32,6 +35,8 @@ class PoseDetectionApp:
         self.ui.label_video.clear()
         if self.cap is not None:
             self.cap.release()
+        print("个数：",self.ui.label_count.text())
+        
         cv2.destroyAllWindows()
 
     def select_video(self):
@@ -162,12 +167,16 @@ class PoseDetectionApp:
                     break
 
                 # 检测
-                image, left_elbow_angle, right_elbow_angle = keydet.inference(frame, self.show_box, self.show_kpts)
+                image, left_elbow_angle, right_elbow_angle,add_count = keydet.inference(frame, self.show_box, self.show_kpts,self.points)
                 self.frame = image  # 保存当前帧
+                self.count_num+=add_count
 
                 # 显示角度到界面
                 self.ui.label_left_angle.setText(str(left_elbow_angle))
                 self.ui.label_right_angle.setText(str(right_elbow_angle))
+
+                # 显示次数到界面
+                self.ui.label_count.setText(str(self.count_num))
 
                 # 处理绘制
                 if self.drawing and len(self.points) == 1:

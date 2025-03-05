@@ -1,7 +1,8 @@
 import onnxruntime
 import numpy as np
 import cv2
-from core.pose_calculator import calculate_elbow_angle
+import time
+from core.pose_calculator import calculate_elbow_angle,is_midpoint_above_line
 
 # 姿态检测模块
 
@@ -183,9 +184,25 @@ class Keypoint():
         self.session = onnxruntime.InferenceSession(modelpath, providers=['CPUExecutionProvider'])
         self.input_name = self.session.get_inputs()[0].name
         self.label_name = self.session.get_outputs()[0].name
+        # 添加用于跟踪上一次计数的时间戳
+        self.last_count_time = 0  
+        # 添加用于跟踪中心点状态的变量
+        self.was_above = False
 
     # 推理
-    def inference(self,image,show_box,show_kpts):
+    def inference(self,image,show_box,show_kpts,points):
+        #     执行推理过程，对输入图像进行检测和分析。
+
+        #     参数:
+        #     image : ndarray
+        #         输入的图像数组。
+        #     show_box : bool
+        #         是否在图像上显示检测到的边界框。
+        #     show_kpts : bool
+        #         是否在图像上显示关键点。
+        #     points : list of tuples
+        #         连线点
+
         img = letterbox(image)
 
         data = pre_process(img)
@@ -236,12 +253,53 @@ class Keypoint():
                 # 存储关键点信息
                 kpts_map=store_keypoints_info(kpts)
                 
+                #######角度计算######
                 # 手肘角度计算
                 left_elbow_angle,right_elbow_angle = calculate_elbow_angle(kpts_map)
                 # 对结果取两位小数
                 left_elbow_angle = round(left_elbow_angle, 2)
                 right_elbow_angle = round(right_elbow_angle, 2)
 
-                # 连线计算
+                #######计数计算######
+                add_count=0
+                # 获取点3和点4
+                if 3 in kpts_map and 4 in kpts_map:
+                    left_wrist = kpts_map[3]
+                    right_wrist = kpts_map[4]
 
-            return image,left_elbow_angle,right_elbow_angle
+                    # 计算点3和点4的中点是不是再points两点连线的上方
+                    if left_wrist is not None and right_wrist is not None:
+                        midpoint_x = (left_wrist[0] + right_wrist[0]) / 2
+                        midpoint_y = (left_wrist[1] + right_wrist[1]) / 2
+                        midpoint = (midpoint_x, midpoint_y)
+
+                        # 先判断points列表是否为空
+                        if points and len(points) >= 2:
+
+                            point1, point2 = points[0], points[1]
+
+                            # 检查中点是否在points两点的连线的上方
+                            is_above = is_midpoint_above_line(midpoint, point1, point2)
+
+                            # 状态检测和计数逻辑
+                            if is_above:
+                                # 中点在“上方”，更新状态但不计数
+                                self.was_above = True
+                                add_count = 0
+                            else:
+                                # 中点在“下方”，检查是否从“上方”变为“下方”
+                                if self.was_above:  # 上一次在“上方”
+                                    current_time = time.time()
+                                    if current_time - self.last_count_time >= 1.0:
+                                        add_count = 1  # 过线计数
+                                        self.last_count_time = current_time
+                                    else:
+                                        add_count = 0   # 未满1秒，不计数
+                                self.was_above = False  # 更新状态为“下方”
+
+                        else:
+                            add_count = 0
+                    else:
+                        add_count = 0
+
+            return image,left_elbow_angle,right_elbow_angle,add_count
