@@ -177,129 +177,129 @@ def plot_skeleton_kpts(im, kpts, steps=3):
         if conf1 >0.5 and conf2 >0.5:  # 对于肢体，相连的两个关键点置信度 必须同时大于 0.5
             cv2.line(im, pos1, pos2, (int(r), int(g), int(b)), thickness=2)
 
-class Keypoint():
-    def __init__(self,modelpath):
+class Keypoint:
+    """基于 ONNX 模型的关键点检测类"""
+    ACTION_LEVELS = ["优秀", "良好", "一般"]  # 动作等级定义
+    CONF_THRESHOLD = 0.7  # 置信度阈值
+    IOU_THRESHOLD = 0.6   # NMS 的 IoU 阈值
+    COUNT_TIME_THRESHOLD = 1.0  # 计数时间间隔阈值（秒）
 
+    def __init__(self, modelpath):
+        """初始化 Keypoint 检测器"""
         print("==========初始化==========")
         self.session = onnxruntime.InferenceSession(modelpath, providers=['CPUExecutionProvider'])
         self.input_name = self.session.get_inputs()[0].name
         self.label_name = self.session.get_outputs()[0].name
-        # 添加用于跟踪上一次计数的时间戳
-        self.last_count_time = 0  
-        # 添加用于跟踪中心点状态的变量
-        self.was_above = False
+        self.last_count_time = 0.0  # 上次计数时间戳
+        self.was_above = False      # 中点是否在上方的状态
 
-    # 推理
-    def inference(self,image,show_box,show_kpts,points):
-        #     执行推理过程，对输入图像进行检测和分析。
+    def inference(self, image, show_box=True, show_kpts=True, points=None):
+        """执行推理过程，检测边界框和关键点，并计算角度与计数
 
-        #     参数:
-        #     image : ndarray
-        #         输入的图像数组。
-        #     show_box : bool
-        #         是否在图像上显示检测到的边界框。
-        #     show_kpts : bool
-        #         是否在图像上显示关键点。
-        #     points : list of tuples
-        #         连线点
+        参数:
+            image (ndarray): 输入图像数组
+            show_box (bool): 是否显示检测框
+            show_kpts (bool): 是否显示关键点
+            points (list of tuples): 参考连线点
 
+        返回:
+            tuple: (处理后的图像, 左肘角度, 右肘角度, 计数增量)
+        """
+        # 预处理图像
         img = letterbox(image)
-
         data = pre_process(img)
-        # 预测输出float32[1, 56, 8400]
-        pred = self.session.run([self.label_name], {self.input_name: data.astype(np.float32)})[0]
-        # [56, 8400]
-        pred = pred[0]
-        # [8400,56]
-        pred = np.transpose(pred, (1, 0))
-        # 置信度阈值过滤
-        conf = 0.7
-        pred = pred[pred[:, 4] > conf]
 
+        # 模型推理
+        pred = self.session.run([self.label_name], {self.input_name: data.astype(np.float32)})[0][0]
+        pred = np.transpose(pred, (1, 0))  # [8400, 56]
+        pred = pred[pred[:, 4] > self.CONF_THRESHOLD]  # 置信度过滤
+
+        # 未检测到目标时返回默认值
         if len(pred) == 0:
-            # print("没有检测到任何关键点")
-            return image,0,0
+            return image, 0, 0, 0
 
-        else:
-            # 中心宽高转左上点，右下点
-            bboxs = xywh2xyxy(pred)
-            # NMS处理
-            bboxs = nms(bboxs, iou_thresh=0.6)
-            # 坐标从左上点，右下点 到 左上点，宽，高.
-            bboxs = np.array(bboxs)
-            bboxs = xyxy2xywh(bboxs)
-            # 坐标点还原到原图
-            bboxs = scale_boxes(img.shape, bboxs, image.shape)
-            
-            # 画框 画点 画骨架
-            for box in bboxs:
-                # 依次为 检测框（左上点，右下点）、置信度、17个关键点
-                det_bbox, det_scores, kpts = box[0:4], box[4], box[5:]
+        # 处理检测结果
+        bboxs = self._process_predictions(pred, img.shape, image.shape)
 
-                # 画框
-                if show_box:
-                    cv2.rectangle(image, (int(det_bbox[0]), int(det_bbox[1])), (int(det_bbox[2]), int(det_bbox[3])),(0, 0, 255), 2)
+        # 分析并可视化检测结果
+        return self._analyze_and_visualize(image, bboxs, show_box, show_kpts, points)
 
-                    # 人体检测置信度
-                    if int(det_bbox[1]) < 30 :
-                        cv2.putText(image, "conf:{:.2f}".format(det_scores), (int(det_bbox[0]) + 5, int(det_bbox[1]) +25),cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 255), 1)
-                    else:
-                        cv2.putText(image, "conf:{:.2f}".format(det_scores), (int(det_bbox[0]) + 5, int(det_bbox[1]) - 5),cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 255), 1)
+    def _process_predictions(self, pred, input_shape, output_shape):
+        """处理模型预测结果"""
+        bboxs = xywh2xyxy(pred)  # 中心宽高转左上右下
+        bboxs = nms(bboxs, iou_thresh=self.IOU_THRESHOLD)  # 非极大值抑制
+        bboxs = np.array(xyxy2xywh(bboxs))  # 左上右下转左上宽高
+        return scale_boxes(input_shape, bboxs, output_shape)  # 坐标缩放到原图
 
-                # 画点 连线
-                if show_kpts:
-                    plot_skeleton_kpts(image, kpts)
+    def _analyze_and_visualize(self, image, bboxs, show_box, show_kpts, points):
+        """分析检测结果并可视化"""
+        for box in bboxs:
+            det_bbox, det_score, kpts = box[0:4], box[4], box[5:]
 
-                # 存储关键点信息
-                kpts_map=store_keypoints_info(kpts)
-                
-                #######角度计算######
-                # 手肘角度计算
-                left_elbow_angle,right_elbow_angle = calculate_elbow_angle(kpts_map)
-                # 对结果取两位小数
-                left_elbow_angle = round(left_elbow_angle, 2)
-                right_elbow_angle = round(right_elbow_angle, 2)
+            # 可视化边界框
+            if show_box:
+                self._draw_bbox(image, det_bbox, det_score)
 
-                #######计数计算######
-                add_count=0
-                # 获取点3和点4
-                if 3 in kpts_map and 4 in kpts_map:
-                    left_wrist = kpts_map[3]
-                    right_wrist = kpts_map[4]
+            # 可视化关键点和骨架
+            if show_kpts:
+                plot_skeleton_kpts(image, kpts)
 
-                    # 计算点3和点4的中点是不是再points两点连线的上方
-                    if left_wrist is not None and right_wrist is not None:
-                        midpoint_x = (left_wrist[0] + right_wrist[0]) / 2
-                        midpoint_y = (left_wrist[1] + right_wrist[1]) / 2
-                        midpoint = (midpoint_x, midpoint_y)
+            # 关键点预处理
+            kpts_map = store_keypoints_info(kpts)
+            # 计算
+            left_elbow_angle, right_elbow_angle = self._calculate_elbow_angles(kpts_map)
+            # 计数统计
+            add_count = self._update_count(kpts_map, points)
 
-                        # 先判断points列表是否为空
-                        if points and len(points) >= 2:
+            return image, left_elbow_angle, right_elbow_angle, add_count
 
-                            point1, point2 = points[0], points[1]
+        # 如果 bboxs 为空，返回默认值（理论上不会发生，因已在之前过滤）
+        return image, 0, 0, 0
 
-                            # 检查中点是否在points两点的连线的上方
-                            is_above = is_midpoint_above_line(midpoint, point1, point2)
+    def _draw_bbox(self, image, bbox, score):
+        """绘制边界框和置信度"""
+        x1, y1, x2, y2 = map(int, bbox)
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        text_pos_y = y1 + 25 if y1 < 30 else y1 - 5
+        cv2.putText(image, f"conf:{score:.2f}", (x1 + 5, text_pos_y),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 255), 1)
 
-                            # 状态检测和计数逻辑
-                            if is_above:
-                                # 中点在“上方”，更新状态但不计数
-                                self.was_above = True
-                                add_count = 0
-                            else:
-                                # 中点在“下方”，检查是否从“上方”变为“下方”
-                                if self.was_above:  # 上一次在“上方”
-                                    current_time = time.time()
-                                    if current_time - self.last_count_time >= 1.0:
-                                        add_count = 1  # 过线计数
-                                        self.last_count_time = current_time
-                                    else:
-                                        add_count = 0   # 未满1秒，不计数
-                                self.was_above = False  # 更新状态为“下方”
+    def _calculate_elbow_angles(self, kpts_map):
+        """计算左右肘角度并保留两位小数"""
+        left_angle, right_angle = calculate_elbow_angle(kpts_map)
+        return round(left_angle, 2), round(right_angle, 2)
 
-                        else:
-                            add_count = 0
-                    else:
-                        add_count = 0
+    def _calculate_midpoint(self, left_wrist, right_wrist):
+        """计算左右腕中点坐标"""
+        if left_wrist is None or right_wrist is None:
+            return None
+        return ((left_wrist[0] + right_wrist[0]) / 2, (left_wrist[1] + right_wrist[1]) / 2)
 
-            return image,left_elbow_angle,right_elbow_angle,add_count
+    def _update_count(self, kpts_map, points):
+        """更新计数逻辑"""
+        # 检查关键点是否存在
+        if not (3 in kpts_map and 4 in kpts_map):
+            return 0
+
+        # 计算中点
+        midpoint = self._calculate_midpoint(kpts_map[3], kpts_map[4])
+        if midpoint is None or not points or len(points) < 2:
+            return 0
+
+        point1, point2 = points[0], points[1]
+        # 检查中点是否越过标记线
+        is_above = is_midpoint_above_line(midpoint, point1, point2)
+
+        if is_above:
+            self.was_above = True
+            return 0
+
+        if self.was_above:
+            current_time = time.time()
+            if current_time - self.last_count_time >= self.COUNT_TIME_THRESHOLD:
+                self.last_count_time = current_time
+                self.was_above = False
+                return 1
+
+        self.was_above = False
+        return 0

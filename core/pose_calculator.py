@@ -9,13 +9,6 @@ import numpy as np
 def calculate_distance(point1, point2):
     return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
-# # 计算三个点之间的角度
-# def calculate_angle(point1, point2, point3):
-#     a = calculate_distance(point1, point2)
-#     b = calculate_distance(point2, point3)
-#     c = calculate_distance(point1, point3)
-#     return math.degrees(math.acos((a ** 2 + b ** 2 - c ** 2) / (2 * a * b)))
-
 # 手肘角度计算
 def calculate_angle(p1, p2, p3):
     # 计算两点之间的向量
