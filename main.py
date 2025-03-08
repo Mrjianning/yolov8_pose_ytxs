@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     # 加载qss 样式
     try:
-        with open("./gui/qss/4.qss", "r", encoding="utf-8") as qss_file:
+        with open("./gui/qss/66.qss", "r", encoding="utf-8") as qss_file:
             qss = qss_file.read()
             app.setStyleSheet(qss)
     except FileNotFoundError:

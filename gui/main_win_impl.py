@@ -4,21 +4,25 @@ from core.pose_detection import Keypoint  # 检测模块
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QFileDialog
-
+from utils.utils import Utils
 
 class PoseDetectionApp:
     def __init__(self, ui):
         self.ui = ui
         self.start_flag = True  # 开始标志位
-        self.cap = None         
-        self.model = 0          # 0 视频 1 摄像头
+        self.cap = None 
+
+        self.config=Utils.load_ini_config("./config.ini")
+        self.model_path=self.config.get("Model","model_path",fallback='./models/yolo11n-pose.onnx')
+        self.video_type=self.config.getint("Model","video_type",fallback=0)                              # 0 视频 1 摄像头
+
         self.show_box = True    # 显示检测框
         self.show_kpts = True   # 显示关键点
         self.drawing = False    # 画线标志位
         self.points = []        # 存储选择的点（frame坐标系）
         self.frame = None       # 当前帧
         self.count_num=0        # 计数器
-        
+
         # 绑定鼠标事件到label_video
         self.ui.label_video.mousePressEvent = self.mouse_press_event
 
@@ -53,10 +57,10 @@ class PoseDetectionApp:
         print("选择模式")
         if index == 0:
             print("选择了视频模式")
-            self.model = 0
+            self.video_type = 0
         elif index == 1:
             print("选择了摄像头模式")
-            self.model = 1
+            self.video_type = 1
     
     def show_box_changed(self, state):
         self.show_box = (state == Qt.Checked)
@@ -136,26 +140,29 @@ class PoseDetectionApp:
         bytes_per_line = 3 * width
         q_img = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
         self.ui.label_video.setPixmap(QPixmap.fromImage(q_img))
-
+    
     def run(self):
-        modelpath = r'models/yolo11n-pose.onnx'
-        keydet = Keypoint(modelpath)
         
-        mode = self.model
-        if mode == 0:
+        # 初始化模型
+        keydet = Keypoint(self.model_path)
+        
+        # 视频源
+        if self.video_type == 0:
             videopath = self.ui.lineEdit_video_path.text()
             print(videopath)
-        elif mode == 1:
+        elif self.video_type == 1:
             videopath = 0
         else:
             print("\033[1;91m 输入错误，请检查mode的赋值 \033[0m")
             return
 
+        # 打开视频源
         self.cap = cv2.VideoCapture(videopath)
         if not self.cap.isOpened():
             print("\033[1;91m 无法打开视频源，请检查路径或设备 \033[0m")
             return
 
+        # 初始化FPS计数器
         start_time = time.time()
         counter = 0
 
@@ -167,8 +174,19 @@ class PoseDetectionApp:
                     break
 
                 # 检测
-                image, left_elbow_angle, right_elbow_angle,add_count,action_level = keydet.inference(frame, self.show_box, self.show_kpts,self.points)
-                self.frame = image  # 保存当前帧
+                result=keydet.inference(frame, self.show_box, self.show_kpts,self.points)
+                # 获取检测结果
+                image=result["image"]
+                left_elbow_angle=result["left_elbow_angle"]
+                right_elbow_angle=result["right_elbow_angle"]
+                add_count=result["add_count"]
+                action_level=result["action_levels"]
+                improve_advise=result["improve_advise"]
+                left_elbow_angle_deviation=result["left_elbow_angle_deviation"]
+                right_elbow_angle_deviation=result["right_elbow_angle_deviation"]
+    
+                # 保存当前帧
+                self.frame = image  
                 self.count_num+=add_count
 
                 # 显示角度到界面
@@ -181,9 +199,17 @@ class PoseDetectionApp:
                 # 显示动作等级到界面
                 self.ui.label_action_level.setText(action_level)
 
-                # 处理绘制
+                # 显示改进建议到界面
+                self.ui.label_improve_advise.setText(improve_advise)
+
+                # 显示角度偏差到界面
+                self.ui.label_left_angle_deviation.setText(str(left_elbow_angle_deviation))
+                self.ui.label_right_angle_deviation.setText(str(right_elbow_angle_deviation))
+
+                # 处理绘制线
                 if self.drawing and len(self.points) == 1:
                     cv2.circle(image, self.points[0], 5, (0, 0, 255), -1)
+
                 elif len(self.points) == 2:
                     cv2.line(image, self.points[0], self.points[1], (0, 255, 0), 2)
                     cv2.circle(image, self.points[0], 5, (0, 0, 255), -1)
