@@ -167,7 +167,7 @@ class PoseDetectionApp:
                     break
 
                 # 检测
-                image, left_elbow_angle, right_elbow_angle,add_count = keydet.inference(frame, self.show_box, self.show_kpts,self.points)
+                image, left_elbow_angle, right_elbow_angle,add_count,action_level = keydet.inference(frame, self.show_box, self.show_kpts,self.points)
                 self.frame = image  # 保存当前帧
                 self.count_num+=add_count
 
@@ -177,6 +177,9 @@ class PoseDetectionApp:
 
                 # 显示次数到界面
                 self.ui.label_count.setText(str(self.count_num))
+
+                # 显示动作等级到界面
+                self.ui.label_action_level.setText(action_level)
 
                 # 处理绘制
                 if self.drawing and len(self.points) == 1:

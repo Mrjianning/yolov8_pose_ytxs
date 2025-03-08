@@ -413,7 +413,7 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QLabel" name="label_left_angle_2">
+                 <widget class="QLabel" name="label_action_level">
                   <property name="text">
                    <string/>
                   </property>
@@ -530,7 +530,7 @@
      <x>0</x>
      <y>0</y>
      <width>1288</width>
-     <height>34</height>
+     <height>33</height>
     </rect>
    </property>
   </widget>

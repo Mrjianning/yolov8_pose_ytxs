@@ -2,6 +2,8 @@ import onnxruntime
 import numpy as np
 import cv2
 import time
+import configparser
+import os
 from core.pose_calculator import calculate_elbow_angle,is_midpoint_above_line
 
 # 姿态检测模块
@@ -179,7 +181,7 @@ def plot_skeleton_kpts(im, kpts, steps=3):
 
 class Keypoint:
     """基于 ONNX 模型的关键点检测类"""
-    ACTION_LEVELS = ["优秀", "良好", "一般"]  # 动作等级定义
+    ACTION_LEVELS = ["优秀", "良好", "一般",""]  # 动作等级定义
     CONF_THRESHOLD = 0.7  # 置信度阈值
     IOU_THRESHOLD = 0.6   # NMS 的 IoU 阈值
     COUNT_TIME_THRESHOLD = 1.0  # 计数时间间隔阈值（秒）
@@ -187,12 +189,48 @@ class Keypoint:
     def __init__(self, modelpath):
         """初始化 Keypoint 检测器"""
         print("==========初始化==========")
+
+        # 配置文件路径
+        config_path = './config.ini'
+        
+        # 检查配置文件是否存在
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"配置文件 {config_path} 不存在")
+        
+        # 读取配置文件
+        config = configparser.ConfigParser()
+        
+        try:
+            config.read(config_path)
+        except Exception as e:
+            raise ValueError(f"读取配置文件失败: {e}")
+        
+        # 获取配置项，并提供默认值
+        try:
+            # Paths 节
+            source_dir = config.get('Paths', 'source_dir', fallback='./source')
+
+            # Settings 节
+            train_ratio = config.getfloat('Settings', 'train_ratio', fallback=0.8)   # 默认值 0.8
+            debug = config.getboolean('Settings', 'debug', fallback=False)           # 默认值 False
+
+            print(f"source_dir: {source_dir}")
+            print(f"train_ratio: {train_ratio}")
+            print(f"debug: {debug}")
+
+        except ValueError as e:
+            raise ValueError(f"配置项类型转换失败: {e}")
+        except Exception as e:
+            raise ValueError(f"读取配置项失败: {e}")
+
+        # 加载模型
         self.session = onnxruntime.InferenceSession(modelpath, providers=['CPUExecutionProvider'])
         self.input_name = self.session.get_inputs()[0].name
         self.label_name = self.session.get_outputs()[0].name
         self.last_count_time = 0.0  # 上次计数时间戳
         self.was_above = False      # 中点是否在上方的状态
-
+        self.action_levels=""       # 动作等级定义
+    
     def inference(self, image, show_box=True, show_kpts=True, points=None):
         """执行推理过程，检测边界框和关键点，并计算角度与计数
 
@@ -248,13 +286,28 @@ class Keypoint:
             kpts_map = store_keypoints_info(kpts)
             # 计算
             left_elbow_angle, right_elbow_angle = self._calculate_elbow_angles(kpts_map)
+
             # 计数统计
             add_count = self._update_count(kpts_map, points)
 
-            return image, left_elbow_angle, right_elbow_angle, add_count
+            # 等级评定
+            if add_count==1:    
+                if left_elbow_angle <=30 and right_elbow_angle <=30:
+                    # 优秀
+                    self.action_levels = self.ACTION_LEVELS[0]
+
+                elif 30 < left_elbow_angle <=60 and 30 < right_elbow_angle <=60:
+                    # 良好
+                    self.action_levels = self.ACTION_LEVELS[1]
+
+                else:
+                    # 一般
+                    self.action_levels = self.ACTION_LEVELS[2] 
+
+            return image, left_elbow_angle, right_elbow_angle, add_count,self.action_levels
 
         # 如果 bboxs 为空，返回默认值（理论上不会发生，因已在之前过滤）
-        return image, 0, 0, 0
+        return image, 0, 0, 0,self.action_levels
 
     def _draw_bbox(self, image, bbox, score):
         """绘制边界框和置信度"""
