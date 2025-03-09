@@ -1,4 +1,5 @@
 import onnxruntime
+import threading
 import numpy as np
 import cv2
 import time
@@ -62,6 +63,11 @@ class Keypoint:
         self.left_elbow_angle_deviation = 0  # 左肘角度偏差
         self.right_elbow_angle_deviation = 0 # 右肘角度偏差
     
+    def _save_image(self, image, filename):
+        """在线程中保存图片的函数"""
+        cv2.imwrite(filename, image)
+        print(f"图片已保存至: {filename}")
+
     def inference(self, image, show_box=True, show_kpts=True, points=None):
         """执行推理过程，检测边界框和关键点，并计算角度与计数
 
@@ -150,7 +156,13 @@ class Keypoint:
                     # 获取当前时间戳（包含微秒）
                     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
                     image_filename = os.path.join(self.save_image_path, f"{timestamp}.jpg")
-                    cv2.imwrite(image_filename, image)
+
+                    # 创建并启动保存线程
+                    save_thread = threading.Thread(
+                        target=self._save_image,
+                        args=(image.copy(), image_filename)  # 使用image.copy()避免线程间的图像数据竞争
+                    )
+                    save_thread.start()
             
             # 改进建议
             if self.action_levels == self.ACTION_LEVELS[2]:
