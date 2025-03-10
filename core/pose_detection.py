@@ -166,7 +166,12 @@ class Keypoint:
             
             # 改进建议
             if self.action_levels == self.ACTION_LEVELS[2]:
+                # 一般等级的建议
                 self.improve_advise = self.IMPROVE_LIST[1]
+
+            elif self.action_levels == self.ACTION_LEVELS[1]:
+                # 良好等级的建议
+                self.improve_advise = self.IMPROVE_LIST[0]
 
             return {
                 'image': image,
