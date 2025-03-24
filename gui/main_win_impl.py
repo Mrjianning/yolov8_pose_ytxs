@@ -18,10 +18,14 @@ class PoseDetectionApp:
 
         self.show_box = True    # 显示检测框
         self.show_kpts = True   # 显示关键点
+        self.is_save_image=False # 是否保存图片
         self.drawing = False    # 画线标志位
         self.points = []        # 存储选择的点（frame坐标系）
         self.frame = None       # 当前帧
         self.count_num=0        # 计数器
+
+        # 初始化模型
+        self.keydet = Keypoint(self.model_path)
 
         # 绑定鼠标事件到label_video
         self.ui.label_video.mousePressEvent = self.mouse_press_event
@@ -62,6 +66,11 @@ class PoseDetectionApp:
             print("选择了摄像头模式")
             self.video_type = 1
     
+    def save_image(self,state):
+        self.is_save_image=(state == Qt.Checked)
+        print("是否保存图片",self.is_save_image)
+        self.keydet.update_save_image_flage(self.is_save_image)
+
     def show_box_changed(self, state):
         self.show_box = (state == Qt.Checked)
 
@@ -143,8 +152,7 @@ class PoseDetectionApp:
     
     def run(self):
         
-        # 初始化模型
-        keydet = Keypoint(self.model_path)
+        
         
         # 视频源
         if self.video_type == 0:
@@ -174,7 +182,7 @@ class PoseDetectionApp:
                     break
 
                 # 检测
-                result=keydet.inference(frame, self.show_box, self.show_kpts,self.points)
+                result=self.keydet.inference(frame, self.show_box, self.show_kpts,self.points)
                 # 获取检测结果
                 image=result["image"]
                 left_elbow_angle=result["left_elbow_angle"]

@@ -50,6 +50,14 @@ class Utils:
         
         return config
     
+    @staticmethod
+    def save_ini_config(config, config_path):
+        """保存ini配置文件"""
+        try:
+            with open(config_path, 'w', encoding='utf-8') as configfile:
+                config.write(configfile)
+        except Exception as e:
+            raise ValueError(f"保存配置文件失败: {e}")
 
 # 示例用法（测试代码）
 if __name__ == "__main__":

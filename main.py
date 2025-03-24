@@ -28,7 +28,8 @@ class MainWindow(QMainWindow):
         self._ui.comboBox_select_model.currentIndexChanged.connect(self.on_comboBox_select_model_currentIndexChanged_)  # 选择模型下拉框
         self._ui.checkBox_show_box.stateChanged.connect(self.on_checkBox_show_box_stateChanged_)                        # 显示检测框复选框
         self._ui.checkBox_show_kpts.stateChanged.connect(self.on_checkBox_show_kpts_stateChanged_)                      # 显示关键点复选框
-        self._ui.pushButton_draw_line.clicked.connect(self.on_pushButton_draw_line_clicked_)                                    # 画线按钮
+        self._ui.checkBox_save_image.stateChanged.connect(self.on_checkBox_save_image_stateChanged_)                    # 保存图片复选框
+        self._ui.pushButton_draw_line.clicked.connect(self.on_pushButton_draw_line_clicked_)                            # 画线按钮
         
     # 开始按钮
     def on_button_start_clicked_(self):
@@ -53,6 +54,10 @@ class MainWindow(QMainWindow):
     # 显示关键点复选框
     def on_checkBox_show_kpts_stateChanged_(self, state):
         self._pose_detection_app.show_kpts_changed(state)
+
+    # 保存图片复选框
+    def on_checkBox_save_image_stateChanged_(self, state):
+        self._pose_detection_app.save_image(state)
 
     # 画线按钮
     def on_pushButton_draw_line_clicked_(self):

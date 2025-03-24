@@ -36,10 +36,13 @@ class Keypoint:
             self.IMPROVE_LIST.append(improve_2)
 
             # Settings 节
+            self.is_save_image = self.config.get('Settings', 'is_save_image', fallback=False) 
             self.save_image_path = self.config.get('Settings', 'save_image_path', fallback="./data/saveImages/") 
             train_ratio = self.config.getfloat('Settings', 'train_ratio', fallback=0.8)   # 默认值 0.8
             debug = self.config.getboolean('Settings', 'debug', fallback=False)           # 默认值 False
 
+            print("==========配置信息==========")
+            print(f"self.is_save_image: {self.is_save_image}")
             print(f"improve_1: {improve_1}")
             print(f"improve_2: {improve_2}")
             print(f"train_ratio: {train_ratio}")
@@ -149,7 +152,7 @@ class Keypoint:
                 self.right_elbow_angle_deviation = round(self.right_elbow_angle-30, 2)
 
                 # 保存当前帧命名为时间戳,保存路径self.save_image_path
-                if self.save_image_path:
+                if self.save_image_path and self.is_save_image:
                     if not os.path.exists(self.save_image_path):
                         os.makedirs(self.save_image_path)
 
@@ -239,3 +242,9 @@ class Keypoint:
 
         self.was_above = False
         return 0
+
+    def update_save_image_flage(self, state):
+        self.is_save_image = state
+        # 写入配置
+        self.config.set("Settings", "is_save_image", str(state))
+        Utils.save_ini_config(self.config, "./config.ini")

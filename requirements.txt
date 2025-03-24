@@ -3,6 +3,6 @@ onnxruntime-gpu
 pyqt5
 PyQt5Designer
 pyqt5-tools
-
+configobj
 
 
