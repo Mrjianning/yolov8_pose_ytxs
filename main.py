@@ -30,6 +30,7 @@ class MainWindow(QMainWindow):
         self._ui.checkBox_show_kpts.stateChanged.connect(self.on_checkBox_show_kpts_stateChanged_)                      # 显示关键点复选框
         self._ui.checkBox_save_image.stateChanged.connect(self.on_checkBox_save_image_stateChanged_)                    # 保存图片复选框
         self._ui.pushButton_draw_line.clicked.connect(self.on_pushButton_draw_line_clicked_)                            # 画线按钮
+        self._ui.pushButton_charts.clicked.connect(self.on_show_charts)                                # 显示图表按钮
         
     # 开始按钮
     def on_button_start_clicked_(self):
@@ -62,6 +63,10 @@ class MainWindow(QMainWindow):
     # 画线按钮
     def on_pushButton_draw_line_clicked_(self):
         self._pose_detection_app.draw_line()
+    
+    # 显示图表按钮
+    def on_show_charts(self):
+        self._pose_detection_app.show_charts()
 
 if __name__ == "__main__":
 

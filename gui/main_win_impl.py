@@ -3,8 +3,10 @@ import time
 from core.pose_detection import Keypoint  # 检测模块
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFileDialog,QDialog
 from utils.utils import Utils
+
+import matplotlib.pyplot as plt
 
 class PoseDetectionApp:
     def __init__(self, ui):
@@ -150,9 +152,17 @@ class PoseDetectionApp:
         q_img = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
         self.ui.label_video.setPixmap(QPixmap.fromImage(q_img))
     
+    def show_charts(self):
+        print("显示图表窗口")
+
+        # 4. 在弹窗上显示图表
+        # 这里可以添加代码来绘制图表，使用 matplotlib 或其他库
+        # 例如：
+        plt.plot([1, 2, 3, 4], [1, 4, 9, 16])
+        plt.show()
+
+
     def run(self):
-        
-        
         
         # 视频源
         if self.video_type == 0:

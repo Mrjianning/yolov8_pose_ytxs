@@ -109,6 +109,13 @@
         </spacer>
        </item>
        <item>
+        <widget class="QPushButton" name="pushButton_charts">
+         <property name="text">
+          <string>图表</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QPushButton" name="pushButton_draw_line">
          <property name="text">
           <string>绘制连线</string>
@@ -271,7 +278,7 @@
                 <string>动作分析</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                <set>Qt::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -376,7 +383,7 @@
                 <string>数据分析与统计</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                <set>Qt::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -540,7 +547,7 @@
      <x>0</x>
      <y>0</y>
      <width>1920</width>
-     <height>34</height>
+     <height>33</height>
     </rect>
    </property>
   </widget>
