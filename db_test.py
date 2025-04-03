@@ -1,4 +1,21 @@
 from database.db_controller import PullUpTrainerDB
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+
+# 设置中文字体
+def set_chinese_font():
+    try:
+        # 尝试使用系统字体（Windows）
+        rcParams['font.sans-serif'] = ['SimHei']  # 黑体
+        # 尝试使用系统字体（Mac/Linux）
+        # rcParams['font.sans-serif'] = ['Arial Unicode MS']  # Mac
+        # rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei']  # Linux
+        rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+    except:
+        print("警告：中文字体设置失败，图表可能无法正常显示中文")
+
+# 在程序开始时调用
+set_chinese_font()
 
 # 测试代码
 if __name__ == "__main__":
@@ -43,7 +60,6 @@ if __name__ == "__main__":
         print(f"右手角度: {right_angles}")
 
         # 绘制折线图
-        import matplotlib.pyplot as plt
         plt.plot(numbers, left_angles, label='左手角度')
         plt.plot(numbers, right_angles, label='右手角度')
         plt.xlabel('引体向上次数')
