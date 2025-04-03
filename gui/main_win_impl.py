@@ -16,11 +16,21 @@ class PoseDetectionApp:
 
         self.config=Utils.load_ini_config("./config.ini")
         self.model_path=self.config.get("Model","model_path",fallback='./models/yolo11n-pose.onnx')
-        self.video_type=self.config.getint("Model","video_type",fallback=0)                              # 0 视频 1 摄像头
+        self.video_type=self.config.getint("Model","video_type",fallback=0)                              # 0 视频 1 摄像头                            
+        self.is_save_image = self.config.getboolean("Settings", "is_save_image", fallback=False)         # 是否保存图片
+
+        # 安全设置状态（阻塞信号避免意外触发）
+        checkbox = self.ui.checkBox_save_image
+        checkbox.blockSignals(True)
+        checkbox.setChecked(self.is_save_image)
+        checkbox.blockSignals(False)
+        
+        # 连接信号（如果尚未连接）
+        if not checkbox.receivers(checkbox.stateChanged):
+            checkbox.stateChanged.connect(self.on_save_image_changed)
 
         self.show_box = True    # 显示检测框
         self.show_kpts = True   # 显示关键点
-        self.is_save_image=False # 是否保存图片
         self.drawing = False    # 画线标志位
         self.points = []        # 存储选择的点（frame坐标系）
         self.frame = None       # 当前帧
